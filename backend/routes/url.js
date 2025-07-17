@@ -138,3 +138,41 @@ router.delete('/shorten/:shortCode', async (req, res) => {
       res.status(500).json({ error: 'Failed to delete URL' });
     }
   });
+
+  // Get URL statistics
+router.get('/shorten/:shortCode/stats', async (req, res) => {
+    try {
+      const { shortCode } = req.params;
+      
+      const url = await Url.findOne({ shortCode });
+      
+      if (!url) {
+        return res.status(404).json({ error: 'Short URL not found' });
+      }
+  
+      res.json({
+        id: url._id,
+        url: url.url,
+        shortCode: url.shortCode,
+        createdAt: url.createdAt,
+        updatedAt: url.updatedAt,
+        accessCount: url.accessCount
+      });
+    } catch (error) {
+      console.error('Error retrieving statistics:', error);
+      res.status(500).json({ error: 'Failed to retrieve statistics' });
+    }
+  });
+  
+  // Get all URLs
+  router.get('/urls', async (req, res) => {
+    try {
+      const urls = await Url.find().sort({ createdAt: -1 });
+      res.json(urls);
+    } catch (error) {
+      console.error('Error retrieving URLs:', error);
+      res.status(500).json({ error: 'Failed to retrieve URLs' });
+    }
+  });
+  
+  module.exports = router;
