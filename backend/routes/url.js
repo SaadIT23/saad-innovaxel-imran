@@ -81,3 +81,42 @@ router.get('/shorten/:shortCode', async (req, res) => {
       res.status(500).json({ error: 'Failed to retrieve URL' });
     }
   });
+
+  // Update short URL
+router.put('/shorten/:shortCode', async (req, res) => {
+    try {
+      const { shortCode } = req.params;
+      const { url } = req.body;
+  
+      if (!url) {
+        return res.status(400).json({ error: 'URL is required' });
+      }
+  
+      // Validate URL format
+      if (!/^https?:\/\/.+\..+/.test(url)) {
+        return res.status(400).json({ error: 'Please enter a valid URL' });
+      }
+  
+      const updatedUrl = await Url.findOneAndUpdate(
+        { shortCode },
+        { url },
+        { new: true }
+      );
+  
+      if (!updatedUrl) {
+        return res.status(404).json({ error: 'Short URL not found' });
+      }
+  
+      res.json({
+        id: updatedUrl._id,
+        url: updatedUrl.url,
+        shortCode: updatedUrl.shortCode,
+        createdAt: updatedUrl.createdAt,
+        updatedAt: updatedUrl.updatedAt,
+        accessCount: updatedUrl.accessCount
+      });
+    } catch (error) {
+      console.error('Error updating URL:', error);
+      res.status(500).json({ error: 'Failed to update URL' });
+    }
+  });
