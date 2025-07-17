@@ -1,287 +1,213 @@
-"use client"
+import React, { useState, useEffect } from 'react';
+import { Link, ExternalLink, Copy, Edit, Trash2, BarChart, Plus } from 'lucide-react';
+import CreateUrlForm from './components/CreateUrlForm';
+import UrlCard from './components/UrlCard';
+import EditUrlModal from './components/EditUrlModal';
+import StatsModal from './components/StatsModal';
 
-import { useState, useEffect } from "react"
-import { Plus, Copy, Edit2, Trash2, BarChart3, ExternalLink } from "lucide-react"
-import "./App.css"
-
-const API_BASE = "http://localhost:3001"
+const API_BASE_URL = 'http://localhost:5000/api';
 
 function App() {
-  const [urls, setUrls] = useState([])
-  const [newUrl, setNewUrl] = useState("")
-  const [editingUrl, setEditingUrl] = useState(null)
-  const [editUrl, setEditUrl] = useState("")
-  const [stats, setStats] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState("")
-
-  useEffect(() => {
-    fetchUrls()
-  }, [])
+  const [urls, setUrls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingUrl, setEditingUrl] = useState(null);
+  const [viewingStats, setViewingStats] = useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const fetchUrls = async () => {
     try {
-      const response = await fetch(`${API_BASE}/urls`)
+      const response = await fetch(`${API_BASE_URL}/urls`);
+      const data = await response.json();
+      setUrls(data);
+    } catch (error) {
+      console.error('Error fetching URLs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUrls();
+  }, []);
+
+  const handleCreateUrl = async (url) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/shorten`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
       if (response.ok) {
-        const data = await response.json()
-        setUrls(data)
+        const newUrl = await response.json();
+        setUrls([newUrl, ...urls]);
+        setShowCreateForm(false);
+        return { success: true };
+      } else {
+        const error = await response.json();
+        return { success: false, error: error.error };
       }
     } catch (error) {
-      console.error("Error fetching URLs:", error)
+      return { success: false, error: 'Failed to create short URL' };
     }
-  }
+  };
 
-  const createShortUrl = async (e) => {
-    e.preventDefault()
-    if (!newUrl.trim()) return
-
-    setLoading(true)
+  const handleUpdateUrl = async (shortCode, newUrl) => {
     try {
-      const response = await fetch(`${API_BASE}/shorten`, {
-        method: "POST",
+      const response = await fetch(`${API_BASE_URL}/shorten/${shortCode}`, {
+        method: 'PUT',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url: newUrl }),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setUrls([data, ...urls])
-        setNewUrl("")
-        setMessage("Short URL created successfully!")
-        setTimeout(() => setMessage(""), 3000)
+        const updatedUrl = await response.json();
+        setUrls(urls.map(url => url.shortCode === shortCode ? updatedUrl : url));
+        setEditingUrl(null);
+        return { success: true };
       } else {
-        const error = await response.json()
-        setMessage(error.error || "Failed to create short URL")
-        setTimeout(() => setMessage(""), 3000)
+        const error = await response.json();
+        return { success: false, error: error.error };
       }
     } catch (error) {
-      setMessage("Error creating short URL")
-      setTimeout(() => setMessage(""), 3000)
+      return { success: false, error: 'Failed to update URL' };
     }
-    setLoading(false)
-  }
+  };
 
-  const updateUrl = async (shortCode) => {
-    if (!editUrl.trim()) return
-
+  const handleDeleteUrl = async (shortCode) => {
     try {
-      const response = await fetch(`${API_BASE}/shorten/${shortCode}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: editUrl }),
-      })
+      const response = await fetch(`${API_BASE_URL}/shorten/${shortCode}`, {
+        method: 'DELETE',
+      });
 
       if (response.ok) {
-        const updatedUrl = await response.json()
-        setUrls(urls.map((url) => (url.shortCode === shortCode ? updatedUrl : url)))
-        setEditingUrl(null)
-        setEditUrl("")
-        setMessage("URL updated successfully!")
-        setTimeout(() => setMessage(""), 3000)
+        setUrls(urls.filter(url => url.shortCode !== shortCode));
       }
     } catch (error) {
-      setMessage("Error updating URL")
-      setTimeout(() => setMessage(""), 3000)
+      console.error('Error deleting URL:', error);
     }
-  }
+  };
 
-  const deleteUrl = async (shortCode) => {
-    if (!confirm("Are you sure you want to delete this URL?")) return
+  const handleCopyUrl = (shortCode) => {
+    const shortUrl = `${window.location.origin}/r/${shortCode}`;
+    navigator.clipboard.writeText(shortUrl);
+  };
 
+  const handleRedirect = async (shortCode) => {
     try {
-      const response = await fetch(`${API_BASE}/shorten/${shortCode}`, {
-        method: "DELETE",
-      })
-
+      const response = await fetch(`${API_BASE_URL}/shorten/${shortCode}`);
       if (response.ok) {
-        setUrls(urls.filter((url) => url.shortCode !== shortCode))
-        setMessage("URL deleted successfully!")
-        setTimeout(() => setMessage(""), 3000)
+        const data = await response.json();
+        window.open(data.url, '_blank');
       }
     } catch (error) {
-      setMessage("Error deleting URL")
-      setTimeout(() => setMessage(""), 3000)
+      console.error('Error redirecting:', error);
     }
-  }
+  };
 
-  const getStats = async (shortCode) => {
+  const handleViewStats = async (shortCode) => {
     try {
-      const response = await fetch(`${API_BASE}/shorten/${shortCode}/stats`)
+      const response = await fetch(`${API_BASE_URL}/shorten/${shortCode}/stats`);
       if (response.ok) {
-        const data = await response.json()
-        setStats({ ...stats, [shortCode]: data })
+        const data = await response.json();
+        setViewingStats(data);
       }
     } catch (error) {
-      console.error("Error fetching stats:", error)
+      console.error('Error fetching stats:', error);
     }
-  }
+  };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-    setMessage("Copied to clipboard!")
-    setTimeout(() => setMessage(""), 2000)
-  }
-
-  const redirectToOriginal = async (shortCode) => {
-    try {
-      const response = await fetch(`${API_BASE}/shorten/${shortCode}`)
-      if (response.ok) {
-        const data = await response.json()
-        window.open(data.url, "_blank")
-        // Refresh stats after access
-        setTimeout(() => getStats(shortCode), 500)
-      }
-    } catch (error) {
-      console.error("Error redirecting:", error)
-    }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">URL Shortener</h1>
-          <p className="text-gray-600">Shorten your long URLs and track their usage</p>
+          <div className="flex items-center justify-center mb-4">
+            <Link className="h-8 w-8 text-blue-600 mr-2" />
+            <h1 className="text-4xl font-bold text-gray-900">URL Shortener</h1>
+          </div>
+          <p className="text-gray-600 text-lg">Create and manage your short URLs with ease</p>
         </div>
 
-        {message && (
-          <div className="mb-6 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg">{message}</div>
-        )}
-
-        {/* Create URL Form */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Create Short URL</h2>
-          <form onSubmit={createShortUrl} className="flex gap-4">
-            <input
-              type="url"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              placeholder="Enter your long URL here..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl font-semibold text-gray-900">Your URLs</h2>
             <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              onClick={() => setShowCreateForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              {loading ? "Creating..." : "Shorten"}
+              <Plus className="h-5 w-5" />
+              Create New URL
             </button>
-          </form>
-        </div>
-
-        {/* URLs List */}
-        <div className="bg-white rounded-lg shadow-md">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold">Your Short URLs</h2>
           </div>
 
+          {showCreateForm && (
+            <div className="mb-8">
+              <CreateUrlForm
+                onSubmit={handleCreateUrl}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            </div>
+          )}
+
           {urls.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No URLs created yet. Create your first short URL above!</div>
+            <div className="bg-white rounded-lg shadow-md p-12 text-center">
+              <Link className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No URLs yet</h3>
+              <p className="text-gray-600 mb-6">Create your first short URL to get started</p>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg inline-flex items-center gap-2 transition-colors"
+              >
+                <Plus className="h-5 w-5" />
+                Create Your First URL
+              </button>
+            </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="grid gap-4">
               {urls.map((url) => (
-                <div key={url.shortCode} className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-gray-500">Short URL:</span>
-                        <code className="px-2 py-1 bg-gray-100 rounded text-sm">{`${API_BASE}/${url.shortCode}`}</code>
-                        <button
-                          onClick={() => copyToClipboard(`${API_BASE}/${url.shortCode}`)}
-                          className="p-1 text-gray-400 hover:text-gray-600"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => redirectToOriginal(url.shortCode)}
-                          className="p-1 text-gray-400 hover:text-gray-600"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {editingUrl === url.shortCode ? (
-                        <div className="flex gap-2 mb-2">
-                          <input
-                            type="url"
-                            value={editUrl}
-                            onChange={(e) => setEditUrl(e.target.value)}
-                            className="flex-1 px-3 py-1 border border-gray-300 rounded text-sm"
-                            placeholder="Enter new URL"
-                          />
-                          <button
-                            onClick={() => updateUrl(url.shortCode)}
-                            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingUrl(null)
-                              setEditUrl("")
-                            }}
-                            className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="mb-2">
-                          <span className="text-sm font-medium text-gray-500">Original URL:</span>
-                          <p className="text-sm text-gray-700 break-all">{url.url}</p>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span>Created: {new Date(url.createdAt).toLocaleDateString()}</span>
-                        <span>Updated: {new Date(url.updatedAt).toLocaleDateString()}</span>
-                        {stats[url.shortCode] && (
-                          <span className="font-medium">Clicks: {stats[url.shortCode].accessCount || 0}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 ml-4">
-                      <button
-                        onClick={() => getStats(url.shortCode)}
-                        className="p-2 text-gray-400 hover:text-blue-600"
-                        title="Get Statistics"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingUrl(url.shortCode)
-                          setEditUrl(url.url)
-                        }}
-                        className="p-2 text-gray-400 hover:text-yellow-600"
-                        title="Edit URL"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteUrl(url.shortCode)}
-                        className="p-2 text-gray-400 hover:text-red-600"
-                        title="Delete URL"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <UrlCard
+                  key={url.shortCode}
+                  url={url}
+                  onEdit={setEditingUrl}
+                  onDelete={handleDeleteUrl}
+                  onCopy={handleCopyUrl}
+                  onRedirect={handleRedirect}
+                  onViewStats={handleViewStats}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {editingUrl && (
+        <EditUrlModal
+          url={editingUrl}
+          onSave={handleUpdateUrl}
+          onClose={() => setEditingUrl(null)}
+        />
+      )}
+
+      {viewingStats && (
+        <StatsModal
+          url={viewingStats}
+          onClose={() => setViewingStats(null)}
+        />
+      )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
