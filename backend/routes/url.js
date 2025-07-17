@@ -51,3 +51,33 @@ router.post('/shorten', async (req, res) => {
         res.status(500).json({ error: 'Failed to create short URL' });
     }
 });
+
+
+// Retrieve original URL
+router.get('/shorten/:shortCode', async (req, res) => {
+    try {
+      const { shortCode } = req.params;
+      
+      const url = await Url.findOne({ shortCode });
+      
+      if (!url) {
+        return res.status(404).json({ error: 'Short URL not found' });
+      }
+  
+      // Increment access count
+      url.accessCount += 1;
+      await url.save();
+  
+      res.json({
+        id: url._id,
+        url: url.url,
+        shortCode: url.shortCode,
+        createdAt: url.createdAt,
+        updatedAt: url.updatedAt,
+        accessCount: url.accessCount
+      });
+    } catch (error) {
+      console.error('Error retrieving URL:', error);
+      res.status(500).json({ error: 'Failed to retrieve URL' });
+    }
+  });
