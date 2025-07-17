@@ -7,40 +7,15 @@ const urlRoutes = require('./routes/url.js');
 const app = express();
 
 // Middleware
-app.use('/api', urlRoutes);
 app.use(cors());
 app.use(express.json());
+app.use('/api', urlRoutes);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/urlshortener');
 
 // URL Schema
-const urlSchema = new mongoose.Schema({
-    url: {
-        type: String,
-        required: true,
-        validate: {
-            validator: function (v) {
-                return /^https?:\/\/.+\..+/.test(v);
-            },
-            message: 'Please enter a valid URL'
-        }
-    },
-    shortCode: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true
-    },
-    accessCount: {
-        type: Number,
-        default: 0
-    }
-}, {
-    timestamps: true
-});
 
-const Url = mongoose.model('Url', urlSchema);
 
 
 
@@ -55,4 +30,4 @@ app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-module.exports = { app, Url };
+module.exports = { app};
